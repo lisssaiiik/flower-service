@@ -1,6 +1,7 @@
 from fastapi import HTTPException, status
 
 class FlowersException(HTTPException):
+    """Базовое исключение для ошибок микросервиса цветов"""
     status_code = 500
     detail = "Внутренняя ошибка сервера"
 

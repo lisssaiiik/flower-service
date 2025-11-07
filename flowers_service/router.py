@@ -12,6 +12,7 @@ from schemas import (
 
 router = APIRouter(prefix="/flowers", tags=["Цвяточки"])
 
+# --- Получение всех букетов по фильтру ---
 @router.get("/filters/", response_model=List[SBouquetsInfo])
 async def get_bouquets_by_filters(
     min_price: Optional[int] = Query(0, description="Минимальная цена букета"),
@@ -27,6 +28,21 @@ async def get_bouquets_by_filters(
     bouquets = await BouquetsDAO.find_all_by_filters(min_price, max_price, flowers_in_bouquet)
     return bouquets
 
+# --- Получение всех букетов ---
+@router.get("/", response_model=List[SBouquetsInfo])
+async def get_bouquets():
+    bouquets = await BouquetsDAO.find_all()
+    return bouquets
+
+# --- Получение одного букета по ID ---
+@router.get("/{f_id}", response_model=SBouquetsInfo)
+async def get_bouquet(f_id: int):
+    bouquet = await BouquetsDAO.find_by_id(f_id)
+    if not bouquet:
+        raise IncorrectFlowerIDException()
+    return bouquet
+
+# --- Добавление букета с компонентами ---
 @router.post("/", response_model=dict)
 async def add_bouquet(body: SAddBouquetWithComponents):
     add_flower = body.add_flower
@@ -58,6 +74,7 @@ async def add_bouquet(body: SAddBouquetWithComponents):
         )
     return {"status": "success", "detail": f"Букет с ID {buq_id} добавлен"}
 
+# --- Добавление категории ---
 @router.post("/category", response_model=dict)
 async def add_category(body: SAddCategory):
     if not body.category.strip():
@@ -65,6 +82,7 @@ async def add_category(body: SAddCategory):
     await CategoriesDAO.add(name=body.category)
     return {"status": "success", "detail": f"Категория '{body.category}' добавлена"}
 
+# --- Обновление описания ---
 @router.put("/description/{bouquet_id}", response_model=dict)
 async def update_bouquets(bouquet_id: int, body: SUpdateDescription):
     bouquet = await BouquetsDAO.find_by_id(model_id=bouquet_id)
