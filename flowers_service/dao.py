@@ -1,6 +1,6 @@
 from sqlalchemy import and_, select, insert, update
-from flowers_service.db import async_session_maker
-from flowers_service.models import BouquetComponents, Bouquets, Categories
+from db import async_session_maker
+from models import BouquetComponents, Bouquets, Categories
 
 class BouquetsDAO:
 
@@ -35,9 +35,9 @@ class BouquetsDAO:
         async with async_session_maker() as session:
             query = insert(cls.model).values(**data).returning(cls.model.id)
             res = await session.execute(query)
-            await session.commit()  # фиксирует изменения в БД, обязательно
-            new_id = res.scalar()  # Получаем id новой записи
-            return new_id  # Возвращаем id
+            await session.commit() 
+            new_id = res.scalar()  
+            return new_id 
         
     @classmethod
     async def update(cls, flower_id, **data):
@@ -56,9 +56,9 @@ class BouquetsDAO:
         '''
         async with async_session_maker() as session:
             query = select(cls.model).filter_by(
-                **filter_by)  # select * from bookigs
+                **filter_by)  
             result = await session.execute(query)
-            return result.scalars().all()  # result.mappings().all()
+            return result.scalars().all() 
 
 
     @classmethod
@@ -66,10 +66,7 @@ class BouquetsDAO:
         '''
         Находит все записи в БД, соответствующие условиям
         '''
-        # select b.id, b.name, b.description, b.price, b.stock_quantity, categories.name from bouquets as b 
-        # join bouquet_components on b.id = bouquet_components.bouquet_id
-        # join categories on bouquet_components.flower_id = categories.id
-        # where categories.name in ('Розы', 'Тюльпаны') and price > 0 and price < 100000
+        
 
         async with async_session_maker() as session:
             if flowers_in_bouquet is not None:
@@ -101,9 +98,9 @@ class CategoriesDAO:
         async with async_session_maker() as session:
             query = insert(cls.model).values(**data).returning(cls.model.id)
             res = await session.execute(query)
-            await session.commit()  # фиксирует изменения в БД, обязательно
-            new_id = res.scalar()  # Получаем id новой записи
-            return new_id  # Возвращаем id
+            await session.commit()  
+            new_id = res.scalar()  
+            return new_id 
 
 
 class ComponentsDAO:
@@ -118,7 +115,7 @@ class ComponentsDAO:
         async with async_session_maker() as session:
             query = insert(cls.model).values(**data).returning(cls.model.id)
             res = await session.execute(query)
-            await session.commit()  # фиксирует изменения в БД, обязательно
-            new_id = res.scalar()  # Получаем id новой записи
-            return new_id  # Возвращаем id
+            await session.commit()  
+            new_id = res.scalar()  
+            return new_id 
 

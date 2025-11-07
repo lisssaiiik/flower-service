@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from flowers_service.router import router as flowers_router
+from router import router as flowers_router
 
 
 app = FastAPI(title="Flowers microservice")

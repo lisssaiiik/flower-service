@@ -1,77 +1,77 @@
 from typing import List, Optional
-from fastapi import Depends, Query
-from fastapi import APIRouter
-from flowers_service.dao import BouquetsDAO, CategoriesDAO, ComponentsDAO
-from flowers_service.dependencies import get_current_user
-from flowers_service.exceptions import IncorrectFlowerIDException, IncorrectRoleException
-from flowers_service.schemas import SAddBouquet, SBouquetsInfo, SComponentBouquet
-
+from fastapi import APIRouter, Query, Body
+from dao import BouquetsDAO, CategoriesDAO, ComponentsDAO
+from exceptions import (
+    IncorrectFlowerIDException, FlowersException,
+    InvalidPriceException, InvalidQuantityException, EmptyFieldException
+)
+from schemas import (
+    SAddBouquetWithComponents, SAddCategory, SUpdateDescription,
+    SBouquetsInfo
+)
 
 router = APIRouter(prefix="/flowers", tags=["Цвяточки"])
 
-
-@router.get("/filters/")
+@router.get("/filters/", response_model=List[SBouquetsInfo])
 async def get_bouquets_by_filters(
-    min_price: Optional[int] = Query(description="Минимальная цена букета",default=0),
-    max_price: Optional[int] = Query(description="Максимальная цена букета", default=1_000_000),
-    flowers_in_bouquet: Optional[List[str]] = Query(None, description="Цветы, входящие в составь букета, вводите через запятую")):
-    """Возвращает все букеты"""
-    if flowers_in_bouquet is not None:
+    min_price: Optional[int] = Query(0, description="Минимальная цена букета"),
+    max_price: Optional[int] = Query(1_000_000, description="Максимальная цена букета"),
+    flowers_in_bouquet: Optional[List[str]] = Query(None, description="Цветы через запятую")
+):
+    if min_price < 0 or max_price < 0:
+        raise InvalidPriceException(detail="Цены не могут быть отрицательными")
+    if min_price > max_price:
+        raise InvalidPriceException(detail="Минимальная цена не может быть больше максимальной")
+    if flowers_in_bouquet:
         flowers_in_bouquet = flowers_in_bouquet[0].split(",")
     bouquets = await BouquetsDAO.find_all_by_filters(min_price, max_price, flowers_in_bouquet)
     return bouquets
 
+@router.post("/", response_model=dict)
+async def add_bouquet(body: SAddBouquetWithComponents):
+    add_flower = body.add_flower
+    components = body.components
 
-@router.get("/", response_model=List[SBouquetsInfo])
-async def get_bouquets():
-    """Возвращает все букеты"""
-    bouquets = await BouquetsDAO.find_all()
-    return bouquets
+    if not add_flower.name.strip() or not add_flower.description.strip():
+        raise EmptyFieldException(detail="Название и описание букета не могут быть пустыми")
+    if add_flower.price <= 0:
+        raise InvalidPriceException(detail="Цена должна быть больше 0")
+    if add_flower.stock_quantity < 0:
+        raise InvalidQuantityException(detail="Количество не может быть отрицательным")
+    if not components:
+        raise IncorrectFlowerIDException()
 
+    buq_id = await BouquetsDAO.add(
+        name=add_flower.name,
+        description=add_flower.description,
+        price=add_flower.price,
+        stock_quantity=add_flower.stock_quantity
+    )
 
-@router.get("/{f_id}")
-async def get_bouquet(f_id: int):
-    """Возвращает букет по ID"""
-    bouquet = await BouquetsDAO.find_by_id(f_id)
-    return bouquet
-
-
-@router.post("/")
-async def add_bouquet(add_flower: SAddBouquet,
-                      components: List[SComponentBouquet],
-                      current_user = Depends(get_current_user)):
-    """Добавление цветов в каталог товаров. Доступно только администраторам"""
-    if current_user['role'] != 'admin':
-        raise IncorrectRoleException
-    if components == []: # проверка, что список не пустой
-        raise IncorrectFlowerIDException
-    # добавляем букет в БД
-    buq_id = await BouquetsDAO.add(name=add_flower.name,
-                                     description=add_flower.description,
-                                     price=add_flower.price,
-                                     stock_quantity=add_flower.stock_quantity)
-    # добавляем компоненты букета в БД
     for component in components:
-        await ComponentsDAO.add(bouquet_id=buq_id,
-                                flower_id=component.flower_id,
-                                quantity=component.quantity)
-    return {"status": "success",
-            "detail": f"Был добавлен букет с ID {buq_id}"}
+        if component.quantity <= 0:
+            raise InvalidQuantityException(detail="Количество компонента должно быть больше 0")
+        await ComponentsDAO.add(
+            bouquet_id=buq_id,
+            flower_id=component.flower_id,
+            quantity=component.quantity
+        )
+    return {"status": "success", "detail": f"Букет с ID {buq_id} добавлен"}
 
+@router.post("/category", response_model=dict)
+async def add_category(body: SAddCategory):
+    if not body.category.strip():
+        raise EmptyFieldException(detail="Название категории не может быть пустым")
+    await CategoriesDAO.add(name=body.category)
+    return {"status": "success", "detail": f"Категория '{body.category}' добавлена"}
 
-@router.post("/category")
-async def add_category(category: str, current_user = Depends(get_current_user)):
-    """Добавление категории цветов. Доступно только администраторам"""
-    if current_user['role'] != 'admin':
-        raise IncorrectRoleException
-    await CategoriesDAO.add(name=category)
-
-
-@router.put("/description/{bouquet_id}")
-async def update_bouquets(bouquet_id: int, new_description: str, current_user = Depends(get_current_user)):
-    if current_user['role'] != 'admin':
-        raise IncorrectRoleException
+@router.put("/description/{bouquet_id}", response_model=dict)
+async def update_bouquets(bouquet_id: int, body: SUpdateDescription):
     bouquet = await BouquetsDAO.find_by_id(model_id=bouquet_id)
-    if bouquet is None:
-        raise IncorrectFlowerIDException
-    await BouquetsDAO.update(flower_id=bouquet_id, description=new_description)
+    if not bouquet:
+        raise IncorrectFlowerIDException()
+    if not body.new_description.strip():
+        raise EmptyFieldException(detail="Описание не может быть пустым")
+
+    await BouquetsDAO.update(flower_id=bouquet_id, description=body.new_description)
+    return {"status": "success", "detail": f"Описание букета {bouquet_id} обновлено"}

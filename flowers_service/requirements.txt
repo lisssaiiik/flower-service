@@ -1,0 +1,11 @@
+fastapi
+uvicorn[standard]
+sqlalchemy
+asyncpg
+python-dotenv
+pydantic
+pydantic-settings
+passlib
+email-validator
+pika
+PyJWT

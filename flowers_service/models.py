@@ -1,5 +1,5 @@
 from sqlalchemy import Column, Float, ForeignKey, Integer, String, Text
-from flowers_service.db import Base
+from db import Base
 
 class Categories(Base):
     """Модель категории цветов"""
